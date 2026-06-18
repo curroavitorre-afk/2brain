@@ -112,6 +112,12 @@ export default function AppShell({ session }) {
   const [savingTag, setSavingTag]     = useState(false)
   const [tagDropdownFor, setTagDropdownFor] = useState(null)
 
+  // Chat Consejero state
+  const [chatOpen, setChatOpen]       = useState(false)
+  const [chatQuery, setChatQuery]     = useState('')
+  const [chatPrompt, setChatPrompt]   = useState('')
+  const [copied, setCopied]           = useState(false)
+
   useEffect(() => {
     async function loadData() {
       const [notesRes, tagsRes] = await Promise.all([
@@ -227,6 +233,33 @@ export default function AppShell({ session }) {
     setTagDropdownFor(null)
   }
 
+  function generatePrompt(pregunta) {
+    if (!pregunta.trim()) return
+    const activas = notes.filter(n => !n.completed)
+    const completadas = notes.filter(n => n.completed)
+    const prompt = `Eres un consejero estratégico personal. Aquí están todas mis notas e ideas actuales:
+
+NOTAS ACTIVAS (${activas.length}):
+${activas.map((n, i) => `${i + 1}. [${n.categories.join(', ')}] ${n.text}${n.summary ? ` → ${n.summary}` : ''}`).join('\n')}
+${completadas.length > 0 ? `\nNOTAS COMPLETADAS (${completadas.length}):\n${completadas.map((n, i) => `${i + 1}. [${n.categories.join(', ')}] ${n.text}`).join('\n')}\n` : ''}
+Mi pregunta: ${pregunta}`
+    setChatPrompt(prompt)
+  }
+
+  function handleCopyPrompt() {
+    if (!chatPrompt) return
+    navigator.clipboard.writeText(chatPrompt).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handleClearChat() {
+    setChatQuery('')
+    setChatPrompt('')
+    setCopied(false)
+  }
+
   async function handleUnassignTag(note, tagId) {
     const newTags = (note.custom_tags || []).filter(t => t !== tagId)
     const { data, error } = await supabase.from('notes').update({ custom_tags: newTags }).eq('id', note.id).select().single()
@@ -275,6 +308,77 @@ export default function AppShell({ session }) {
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
+        </div>
+
+        {/* Chat Consejero */}
+        <div className="chat-consejero">
+          <button
+            className={`chat-consejero-toggle${chatOpen ? ' chat-consejero-toggle--open' : ''}`}
+            onClick={() => setChatOpen(p => !p)}
+          >
+            <span>🧠 Chat Consejero</span>
+            <span className="chat-consejero-chevron">{chatOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {chatOpen && (
+            <div className="chat-consejero-body">
+              <div className="chat-consejero-input-row">
+                <input
+                  className="chat-consejero-input"
+                  placeholder="¿Qué quieres analizar o decidir?"
+                  value={chatQuery}
+                  onChange={e => {
+                    setChatQuery(e.target.value)
+                    if (e.target.value.trim()) generatePrompt(e.target.value)
+                    else setChatPrompt('')
+                  }}
+                  onKeyDown={e => e.key === 'Enter' && generatePrompt(chatQuery)}
+                />
+                {(chatQuery || chatPrompt) && (
+                  <button className="chat-consejero-clear" onClick={handleClearChat}>×</button>
+                )}
+              </div>
+
+              <div className="chat-suggestions">
+                {['¿Por qué idea empiezo?', '¿Cuál tiene más potencial?', 'Desarrolla la mejor idea', '¿Qué ideas se conectan?'].map(s => (
+                  <button
+                    key={s}
+                    className="chat-suggestion-btn"
+                    onClick={() => { setChatQuery(s); generatePrompt(s) }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {chatPrompt && (
+                <>
+                  <textarea
+                    className="chat-prompt-output"
+                    readOnly
+                    value={chatPrompt}
+                  />
+                  <div className="chat-consejero-actions">
+                    <button
+                      className={`chat-copy-btn${chatPrompt ? ' chat-copy-btn--active' : ''}`}
+                      onClick={handleCopyPrompt}
+                      disabled={!chatPrompt}
+                    >
+                      {copied ? '✓ Copiado' : 'Copiar prompt'}
+                    </button>
+                    <a
+                      href="https://claude.ai"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="chat-claudeai-link"
+                    >
+                      Abrir Claude.ai ↗
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Filter bar + tag panel */}
