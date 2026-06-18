@@ -30,6 +30,10 @@ const PALETTE = [
 
 const PALETTE_MAP = Object.fromEntries(PALETTE.map(p => [p.id, p.color]))
 
+const PRIORITY_ORDER = { alta: 0, media: 1, baja: 2 }
+const PRIORITY_COLOR = { alta: '#EF4444', media: '#F5C842', baja: '#84CC16' }
+const PRIORITY_TEXT  = { alta: '#fff',    media: '#000',    baja: '#000' }
+
 function normalize(text) {
   return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
@@ -47,7 +51,6 @@ function categorize(text) {
     { id: 'reflexion',   kw: ['me di cuenta', 'aprendi que', 'reflexion', 'valores', 'proposito', 'crecimiento personal'] },
     { id: 'habito',      kw: ['habito', 'rutina', 'cada dia', 'todos los dias', 'disciplina', 'constancia'] },
   ]
-
   const matched = []
   for (const rule of rules) {
     if (matched.length >= 3) break
@@ -59,6 +62,17 @@ function categorize(text) {
 function formatDate(iso) {
   const d = new Date(iso)
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+}
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function isOverdue(dateStr) {
+  if (!dateStr) return false
+  return dateStr < new Date().toISOString().slice(0, 10)
 }
 
 async function callGroq(noteId, text, onSuccess) {
@@ -79,16 +93,11 @@ async function callGroq(noteId, text, onSuccess) {
         }],
       }),
     })
-
     const json = await res.json()
     const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
     const parsed = JSON.parse(raw)
-
     if (parsed.summary && Array.isArray(parsed.keywords)) {
-      await supabase
-        .from('notes')
-        .update({ summary: parsed.summary, keywords: parsed.keywords })
-        .eq('id', noteId)
+      await supabase.from('notes').update({ summary: parsed.summary, keywords: parsed.keywords }).eq('id', noteId)
       onSuccess({ summary: parsed.summary, keywords: parsed.keywords })
     }
   } catch {
@@ -97,6 +106,11 @@ async function callGroq(noteId, text, onSuccess) {
 }
 
 export default function AppShell({ session }) {
+  // Layout
+  const [activeView, setActiveView]   = useState('thoughts')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Notes state
   const [notes, setNotes]             = useState([])
   const [loading, setLoading]         = useState(true)
   const [text, setText]               = useState('')
@@ -105,21 +119,31 @@ export default function AppShell({ session }) {
   const [groqPending, setGroqPending] = useState(new Set())
 
   // Tags state
-  const [tags, setTags]               = useState([])
-  const [showTagPanel, setShowTagPanel] = useState(false)
-  const [newTagName, setNewTagName]   = useState('')
-  const [newTagPalette, setNewTagPalette] = useState('p0')
-  const [savingTag, setSavingTag]     = useState(false)
+  const [tags, setTags]                     = useState([])
+  const [showTagPanel, setShowTagPanel]     = useState(false)
+  const [newTagName, setNewTagName]         = useState('')
+  const [newTagPalette, setNewTagPalette]   = useState('p0')
+  const [savingTag, setSavingTag]           = useState(false)
   const [tagDropdownFor, setTagDropdownFor] = useState(null)
 
   // Category editing state
   const [editingCatsFor, setEditingCatsFor] = useState(null)
 
   // Chat Consejero state
-  const [chatOpen, setChatOpen]       = useState(false)
-  const [chatQuery, setChatQuery]     = useState('')
-  const [chatPrompt, setChatPrompt]   = useState('')
-  const [copied, setCopied]           = useState(false)
+  const [chatOpen, setChatOpen]     = useState(false)
+  const [chatQuery, setChatQuery]   = useState('')
+  const [chatPrompt, setChatPrompt] = useState('')
+  const [copied, setCopied]         = useState(false)
+
+  // Tasks state
+  const [tasks, setTasks]               = useState([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [taskTitle, setTaskTitle]       = useState('')
+  const [taskDesc, setTaskDesc]         = useState('')
+  const [taskPriority, setTaskPriority] = useState('media')
+  const [taskDueDate, setTaskDueDate]   = useState('')
+  const [savingTask, setSavingTask]     = useState(false)
+  const [taskFilter, setTaskFilter]     = useState('all')
 
   useEffect(() => {
     async function loadData() {
@@ -134,11 +158,29 @@ export default function AppShell({ session }) {
     loadData()
   }, [session.user.id])
 
+  useEffect(() => {
+    if (activeView !== 'tasks') return
+    loadTasks()
+  }, [activeView]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadTasks() {
+    setLoadingTasks(true)
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+    if (!error) setTasks(data || [])
+    else console.error('[2brain] tasks table error — create it in Supabase dashboard:', error.message)
+    setLoadingTasks(false)
+  }
+
+  // ── Notes handlers ──────────────────────────────────────
+
   async function handleSave() {
     const trimmed = text.trim()
     if (!trimmed || saving) return
     setSaving(true)
-
     const newNote = {
       id: crypto.randomUUID(),
       user_id: session.user.id,
@@ -150,20 +192,14 @@ export default function AppShell({ session }) {
       completed: false,
       created_at: new Date().toISOString(),
     }
-
     const { data, error } = await supabase.from('notes').insert([newNote]).select().single()
     if (!error && data) {
       setNotes(prev => [data, ...prev])
       setText('')
-
       setGroqPending(prev => new Set([...prev, data.id]))
       callGroq(data.id, trimmed, ({ summary, keywords }) => {
         setNotes(prev => prev.map(n => n.id === data.id ? { ...n, summary, keywords } : n))
-        setGroqPending(prev => {
-          const next = new Set(prev)
-          next.delete(data.id)
-          return next
-        })
+        setGroqPending(prev => { const next = new Set(prev); next.delete(data.id); return next })
       })
     }
     setSaving(false)
@@ -175,11 +211,7 @@ export default function AppShell({ session }) {
 
   async function handleToggleComplete(note) {
     const { data, error } = await supabase
-      .from('notes')
-      .update({ completed: !note.completed })
-      .eq('id', note.id)
-      .select()
-      .single()
+      .from('notes').update({ completed: !note.completed }).eq('id', note.id).select().single()
     if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
   }
 
@@ -188,11 +220,7 @@ export default function AppShell({ session }) {
     const { error } = await supabase.from('notes').delete().eq('id', noteId)
     if (!error) {
       setNotes(prev => prev.filter(n => n.id !== noteId))
-      setGroqPending(prev => {
-        const next = new Set(prev)
-        next.delete(noteId)
-        return next
-      })
+      setGroqPending(prev => { const next = new Set(prev); next.delete(noteId); return next })
     }
   }
 
@@ -200,18 +228,9 @@ export default function AppShell({ session }) {
     const name = newTagName.trim()
     if (!name || savingTag) return
     setSavingTag(true)
-    const newTag = {
-      id: `tag_${Date.now()}`,
-      user_id: session.user.id,
-      name,
-      palette: newTagPalette,
-    }
+    const newTag = { id: `tag_${Date.now()}`, user_id: session.user.id, name, palette: newTagPalette }
     const { data, error } = await supabase.from('tags').insert([newTag]).select().single()
-    if (!error && data) {
-      setTags(prev => [...prev, data])
-      setNewTagName('')
-      setNewTagPalette('p0')
-    }
+    if (!error && data) { setTags(prev => [...prev, data]); setNewTagName(''); setNewTagPalette('p0') }
     setSavingTag(false)
   }
 
@@ -219,10 +238,7 @@ export default function AppShell({ session }) {
     const { error } = await supabase.from('tags').delete().eq('id', tagId)
     if (!error) {
       setTags(prev => prev.filter(t => t.id !== tagId))
-      setNotes(prev => prev.map(n => ({
-        ...n,
-        custom_tags: (n.custom_tags || []).filter(t => t !== tagId),
-      })))
+      setNotes(prev => prev.map(n => ({ ...n, custom_tags: (n.custom_tags || []).filter(t => t !== tagId) })))
       if (filter === tagId) setFilter('all')
     }
   }
@@ -230,10 +246,15 @@ export default function AppShell({ session }) {
   async function handleAssignTag(note, tagId) {
     const currentTags = note.custom_tags || []
     if (currentTags.includes(tagId)) { setTagDropdownFor(null); return }
-    const newTags = [...currentTags, tagId]
-    const { data, error } = await supabase.from('notes').update({ custom_tags: newTags }).eq('id', note.id).select().single()
+    const { data, error } = await supabase.from('notes').update({ custom_tags: [...currentTags, tagId] }).eq('id', note.id).select().single()
     if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
     setTagDropdownFor(null)
+  }
+
+  async function handleUnassignTag(note, tagId) {
+    const newTags = (note.custom_tags || []).filter(t => t !== tagId)
+    const { data, error } = await supabase.from('notes').update({ custom_tags: newTags }).eq('id', note.id).select().single()
+    if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
   }
 
   async function handleToggleCategory(note, catId) {
@@ -246,14 +267,11 @@ export default function AppShell({ session }) {
       if (current.length >= 3) return
       next = [...current, catId]
     }
-    const { data, error } = await supabase
-      .from('notes')
-      .update({ categories: next })
-      .eq('id', note.id)
-      .select()
-      .single()
+    const { data, error } = await supabase.from('notes').update({ categories: next }).eq('id', note.id).select().single()
     if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
   }
+
+  // ── Chat Consejero ───────────────────────────────────────
 
   function generatePrompt(pregunta) {
     if (!pregunta.trim()) return
@@ -276,21 +294,49 @@ Mi pregunta: ${pregunta}`
     })
   }
 
-  function handleClearChat() {
-    setChatQuery('')
-    setChatPrompt('')
-    setCopied(false)
+  function handleClearChat() { setChatQuery(''); setChatPrompt(''); setCopied(false) }
+
+  // ── Tasks handlers ───────────────────────────────────────
+
+  async function handleAddTask() {
+    const title = taskTitle.trim()
+    if (!title || savingTask) return
+    setSavingTask(true)
+    const newTask = {
+      id: crypto.randomUUID(),
+      user_id: session.user.id,
+      title,
+      description: taskDesc.trim() || null,
+      priority: taskPriority,
+      due_date: taskDueDate || null,
+      completed: false,
+      created_at: new Date().toISOString(),
+    }
+    const { data, error } = await supabase.from('tasks').insert([newTask]).select().single()
+    if (!error && data) {
+      setTasks(prev => [data, ...prev])
+      setTaskTitle(''); setTaskDesc(''); setTaskPriority('media'); setTaskDueDate('')
+    } else if (error) {
+      console.error('[2brain] error adding task:', error.message)
+    }
+    setSavingTask(false)
   }
 
-  async function handleUnassignTag(note, tagId) {
-    const newTags = (note.custom_tags || []).filter(t => t !== tagId)
-    const { data, error } = await supabase.from('notes').update({ custom_tags: newTags }).eq('id', note.id).select().single()
-    if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
+  async function handleToggleTask(task) {
+    const { data, error } = await supabase
+      .from('tasks').update({ completed: !task.completed }).eq('id', task.id).select().single()
+    if (!error && data) setTasks(prev => prev.map(t => t.id === task.id ? data : t))
   }
 
-  const usedCategories = CATEGORIES.filter(cat =>
-    notes.some(n => n.categories?.includes(cat.id))
-  )
+  async function handleDeleteTask(taskId) {
+    if (!confirm('¿Eliminar esta tarea?')) return
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+    if (!error) setTasks(prev => prev.filter(t => t.id !== taskId))
+  }
+
+  // ── Derived data ─────────────────────────────────────────
+
+  const usedCategories = CATEGORIES.filter(cat => notes.some(n => n.categories?.includes(cat.id)))
 
   const filtered = notes.filter(note => {
     if (filter === 'all')       return true
@@ -300,401 +346,518 @@ Mi pregunta: ${pregunta}`
     return note.categories?.includes(filter)
   })
 
+  const sortedFilteredTasks = [...tasks]
+    .sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      const pa = PRIORITY_ORDER[a.priority] ?? 3
+      const pb = PRIORITY_ORDER[b.priority] ?? 3
+      if (pa !== pb) return pa - pb
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+      if (a.due_date) return -1
+      if (b.due_date) return 1
+      return 0
+    })
+    .filter(t => {
+      if (taskFilter === 'all')       return true
+      if (taskFilter === 'pending')   return !t.completed
+      if (taskFilter === 'completed') return t.completed
+      return t.priority === taskFilter
+    })
+
+  // ── Render ───────────────────────────────────────────────
+
   return (
     <div className="shell">
-      <header className="shell-header">
-        <span className="shell-logo">2BRAIN</span>
-        <button className="signout-btn" onClick={() => supabase.auth.signOut()}>
-          Cerrar sesión
-        </button>
-      </header>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
 
-      <main className="shell-main">
-        {/* Write area */}
-        <div className="write-area">
-          <textarea
-            className="write-textarea"
-            placeholder="Escribe cualquier pensamiento..."
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={4}
-          />
-          <div className="write-footer">
-            <span className="write-hint">Ctrl + Enter para guardar</span>
-            <button
-              className="save-btn"
-              onClick={handleSave}
-              disabled={!text.trim() || saving}
-            >
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-          </div>
-        </div>
+      {/* Sidebar */}
+      <aside className={`shell-sidebar${sidebarOpen ? ' shell-sidebar--open' : ''}`}>
+        <div className="sidebar-logo">2BRAIN</div>
 
-        {/* Chat Consejero */}
-        <div className="chat-consejero">
+        <nav className="sidebar-nav">
           <button
-            className={`chat-consejero-toggle${chatOpen ? ' chat-consejero-toggle--open' : ''}`}
-            onClick={() => setChatOpen(p => !p)}
+            className={`sidebar-nav-item${activeView === 'thoughts' ? ' sidebar-nav-item--active' : ''}`}
+            onClick={() => { setActiveView('thoughts'); setSidebarOpen(false) }}
           >
-            <span>🧠 Chat Consejero</span>
-            <span className="chat-consejero-chevron">{chatOpen ? '▲' : '▼'}</span>
+            <span className="sidebar-nav-icon">🧠</span>
+            Pensamientos
           </button>
+          <button
+            className={`sidebar-nav-item${activeView === 'tasks' ? ' sidebar-nav-item--active' : ''}`}
+            onClick={() => { setActiveView('tasks'); setSidebarOpen(false) }}
+          >
+            <span className="sidebar-nav-icon">✅</span>
+            Tareas
+          </button>
+        </nav>
 
-          {chatOpen && (
-            <div className="chat-consejero-body">
-              <div className="chat-consejero-input-row">
-                <input
-                  className="chat-consejero-input"
-                  placeholder="¿Qué quieres analizar o decidir?"
-                  value={chatQuery}
-                  onChange={e => {
-                    setChatQuery(e.target.value)
-                    if (e.target.value.trim()) generatePrompt(e.target.value)
-                    else setChatPrompt('')
-                  }}
-                  onKeyDown={e => e.key === 'Enter' && generatePrompt(chatQuery)}
+        <div className="sidebar-footer">
+          <span className="sidebar-email">{session.user.email}</span>
+          <button className="signout-btn" onClick={() => supabase.auth.signOut()}>
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+
+      {/* Main body */}
+      <div className="shell-body">
+        <header className="shell-header">
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(p => !p)}>☰</button>
+          <span className="shell-header-title">
+            {activeView === 'thoughts' ? '🧠 Pensamientos' : '✅ Tareas'}
+          </span>
+        </header>
+
+        <main className="shell-main">
+
+          {/* ── THOUGHTS VIEW ── */}
+          {activeView === 'thoughts' && (
+            <>
+              {/* Write area */}
+              <div className="write-area">
+                <textarea
+                  className="write-textarea"
+                  placeholder="Escribe cualquier pensamiento..."
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={4}
                 />
-                {(chatQuery || chatPrompt) && (
-                  <button className="chat-consejero-clear" onClick={handleClearChat}>×</button>
+                <div className="write-footer">
+                  <span className="write-hint">Ctrl + Enter para guardar</span>
+                  <button className="save-btn" onClick={handleSave} disabled={!text.trim() || saving}>
+                    {saving ? 'Guardando…' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat Consejero */}
+              <div className="chat-consejero">
+                <button
+                  className={`chat-consejero-toggle${chatOpen ? ' chat-consejero-toggle--open' : ''}`}
+                  onClick={() => setChatOpen(p => !p)}
+                >
+                  <span>🧠 Chat Consejero</span>
+                  <span className="chat-consejero-chevron">{chatOpen ? '▲' : '▼'}</span>
+                </button>
+
+                {chatOpen && (
+                  <div className="chat-consejero-body">
+                    <div className="chat-consejero-input-row">
+                      <input
+                        className="chat-consejero-input"
+                        placeholder="¿Qué quieres analizar o decidir?"
+                        value={chatQuery}
+                        onChange={e => {
+                          setChatQuery(e.target.value)
+                          if (e.target.value.trim()) generatePrompt(e.target.value)
+                          else setChatPrompt('')
+                        }}
+                        onKeyDown={e => e.key === 'Enter' && generatePrompt(chatQuery)}
+                      />
+                      {(chatQuery || chatPrompt) && (
+                        <button className="chat-consejero-clear" onClick={handleClearChat}>×</button>
+                      )}
+                    </div>
+
+                    <div className="chat-suggestions">
+                      {['¿Por qué idea empiezo?', '¿Cuál tiene más potencial?', 'Desarrolla la mejor idea', '¿Qué ideas se conectan?'].map(s => (
+                        <button key={s} className="chat-suggestion-btn" onClick={() => { setChatQuery(s); generatePrompt(s) }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+
+                    {chatPrompt && (
+                      <>
+                        <textarea className="chat-prompt-output" readOnly value={chatPrompt} />
+                        <div className="chat-consejero-actions">
+                          <button
+                            className={`chat-copy-btn${chatPrompt ? ' chat-copy-btn--active' : ''}`}
+                            onClick={handleCopyPrompt}
+                            disabled={!chatPrompt}
+                          >
+                            {copied ? '✓ Copiado' : 'Copiar prompt'}
+                          </button>
+                          <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" className="chat-claudeai-link">
+                            Abrir Claude.ai ↗
+                          </a>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
 
-              <div className="chat-suggestions">
-                {['¿Por qué idea empiezo?', '¿Cuál tiene más potencial?', 'Desarrolla la mejor idea', '¿Qué ideas se conectan?'].map(s => (
+              {/* Filter bar + tag panel */}
+              {!loading && notes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="filters">
+                    {[
+                      { key: 'all',       label: 'Todas' },
+                      { key: 'active',    label: 'Activas' },
+                      { key: 'completed', label: 'Completadas' },
+                    ].map(({ key, label }) => (
+                      <button
+                        key={key}
+                        className={`filter-btn${filter === key ? ' filter-btn--active' : ''}`}
+                        onClick={() => setFilter(key)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                    {usedCategories.map(cat => (
+                      <button
+                        key={cat.id}
+                        className={`filter-btn${filter === cat.id ? ' filter-btn--active' : ''}`}
+                        onClick={() => setFilter(cat.id)}
+                        style={filter === cat.id ? { borderColor: cat.color, color: cat.color } : {}}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                    {tags.map(tag => {
+                      const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
+                      return (
+                        <button
+                          key={tag.id}
+                          className={`filter-btn${filter === tag.id ? ' filter-btn--active' : ''}`}
+                          onClick={() => setFilter(filter === tag.id ? 'all' : tag.id)}
+                          style={filter === tag.id ? { borderColor: color, color } : {}}
+                        >
+                          <span className="filter-tag-dot" style={{ background: color }} />
+                          {tag.name}
+                        </button>
+                      )
+                    })}
+                    <button
+                      className={`tag-add-panel-btn${showTagPanel ? ' tag-add-panel-btn--open' : ''}`}
+                      onClick={() => setShowTagPanel(p => !p)}
+                    >
+                      ＋ Etiqueta
+                    </button>
+                  </div>
+
+                  {showTagPanel && (
+                    <div className="tag-panel">
+                      <div className="tag-panel-header">
+                        <span className="tag-panel-title">Etiquetas personalizadas</span>
+                        <button className="tag-panel-close" onClick={() => setShowTagPanel(false)}>×</button>
+                      </div>
+                      <div className="tag-panel-create">
+                        <input
+                          className="tag-name-input"
+                          placeholder="Nombre de etiqueta"
+                          value={newTagName}
+                          onChange={e => setNewTagName(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
+                          maxLength={30}
+                        />
+                        <div className="tag-palette">
+                          {PALETTE.map(p => (
+                            <button
+                              key={p.id}
+                              className={`tag-swatch${newTagPalette === p.id ? ' tag-swatch--selected' : ''}`}
+                              style={{ background: p.color }}
+                              onClick={() => setNewTagPalette(p.id)}
+                            />
+                          ))}
+                        </div>
+                        <button className="tag-create-btn" onClick={handleCreateTag} disabled={!newTagName.trim() || savingTag}>
+                          Crear
+                        </button>
+                      </div>
+                      {tags.length > 0 && (
+                        <div className="tag-list">
+                          {tags.map(tag => {
+                            const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
+                            return (
+                              <div
+                                key={tag.id}
+                                className="tag-list-item"
+                                style={{ background: `${color}22`, border: `1px solid ${color}55`, color }}
+                              >
+                                {tag.name}
+                                <button className="tag-list-remove" onClick={() => handleDeleteTag(tag.id)} style={{ color }}>×</button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Backdrop for tag dropdown */}
+              {tagDropdownFor && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setTagDropdownFor(null)} />
+              )}
+
+              {/* Notes grid */}
+              {loading ? (
+                <p className="notes-state">Cargando notas…</p>
+              ) : filtered.length === 0 ? (
+                <p className="notes-state">
+                  {notes.length === 0 ? 'Escribe tu primera nota arriba.' : 'No hay notas con este filtro.'}
+                </p>
+              ) : (
+                <div className="notes-grid">
+                  {filtered.map(note => {
+                    const primaryColor = CATEGORY_MAP[note.categories?.[0]]?.color ?? '#475569'
+                    const isPending = groqPending.has(note.id)
+                    const assignedTags = (note.custom_tags || []).map(tid => tags.find(t => t.id === tid)).filter(Boolean)
+                    const availableTags = tags.filter(t => !(note.custom_tags || []).includes(t.id))
+
+                    return (
+                      <div key={note.id} className={`note-card${note.completed ? ' note-card--completed' : ''}`}>
+                        {/* Category badges */}
+                        <div className="note-badges">
+                          {(note.categories || []).map(catId => {
+                            const cat = CATEGORY_MAP[catId]
+                            return cat ? (
+                              <span key={catId} className="note-badge" style={{ background: cat.color, color: cat.textColor }}>
+                                {cat.label}
+                              </span>
+                            ) : null
+                          })}
+                          <button
+                            className={`note-cat-edit-btn${editingCatsFor === note.id ? ' note-cat-edit-btn--active' : ''}`}
+                            onClick={() => setEditingCatsFor(editingCatsFor === note.id ? null : note.id)}
+                            title="Editar categorías"
+                          >
+                            ✏
+                          </button>
+                        </div>
+
+                        {/* Category editor */}
+                        {editingCatsFor === note.id && (
+                          <div className="cat-editor">
+                            {CATEGORIES.map(cat => {
+                              const active = (note.categories || []).includes(cat.id)
+                              const atMax = (note.categories || []).length >= 3
+                              const disabled = !active && atMax
+                              return (
+                                <button
+                                  key={cat.id}
+                                  className={`cat-editor-btn${active ? ' cat-editor-btn--active' : ''}${disabled ? ' cat-editor-btn--disabled' : ''}`}
+                                  style={active ? { background: cat.color, color: cat.textColor, borderColor: '#F5C842' } : {}}
+                                  onClick={() => handleToggleCategory(note, cat.id)}
+                                  disabled={disabled}
+                                  title={disabled ? 'Máximo 3 categorías' : undefined}
+                                >
+                                  {cat.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Custom tag pills */}
+                        {(tags.length > 0 || assignedTags.length > 0) && (
+                          <div className="note-tags">
+                            {assignedTags.map(tag => {
+                              const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
+                              return (
+                                <span key={tag.id} className="note-tag-pill" style={{ background: `${color}28`, color, border: `1px solid ${color}50` }}>
+                                  {tag.name}
+                                  <button className="note-tag-unassign" onClick={() => handleUnassignTag(note, tag.id)} style={{ color }}>×</button>
+                                </span>
+                              )
+                            })}
+                            {tags.length > 0 && (
+                              <div className="note-tag-add" style={{ position: 'relative', zIndex: tagDropdownFor === note.id ? 50 : 'auto' }}>
+                                <button className="note-tag-add-btn" onClick={() => setTagDropdownFor(tagDropdownFor === note.id ? null : note.id)}>
+                                  ＋ tag
+                                </button>
+                                {tagDropdownFor === note.id && (
+                                  <div className="note-tag-dropdown">
+                                    {availableTags.length === 0 ? (
+                                      <span className="note-tag-dropdown-empty">Todas asignadas</span>
+                                    ) : (
+                                      availableTags.map(tag => {
+                                        const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
+                                        return (
+                                          <button key={tag.id} className="note-tag-dropdown-item" onClick={() => handleAssignTag(note, tag.id)}>
+                                            <span className="note-tag-dropdown-dot" style={{ background: color }} />
+                                            {tag.name}
+                                          </button>
+                                        )
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Note text */}
+                        <p className="note-text">{note.text}</p>
+
+                        {/* AI enrichment */}
+                        {isPending ? (
+                          <p className="note-generating">Generando resumen…</p>
+                        ) : note.summary ? (
+                          <div className="note-enrichment">
+                            <p className="note-summary" style={{ borderLeftColor: primaryColor }}>{note.summary}</p>
+                            {note.keywords?.length > 0 && (
+                              <div className="note-keywords">
+                                {note.keywords.map(kw => <span key={kw} className="note-keyword">#{kw}</span>)}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {/* Footer */}
+                        <div className="note-footer">
+                          <span className="note-date">{formatDate(note.created_at)}</span>
+                          <div className="note-actions">
+                            <button
+                              className={`note-check${note.completed ? ' note-check--done' : ''}`}
+                              onClick={() => handleToggleComplete(note)}
+                              title={note.completed ? 'Marcar como activa' : 'Marcar como completada'}
+                            >
+                              ✓
+                            </button>
+                            <button className="note-delete" onClick={() => handleDelete(note.id)} title="Eliminar nota">×</button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── TASKS VIEW ── */}
+          {activeView === 'tasks' && (
+            <>
+              {/* Task form */}
+              <div className="task-form">
+                <input
+                  className="task-form-title-input"
+                  placeholder="Título de la tarea (obligatorio)"
+                  value={taskTitle}
+                  onChange={e => setTaskTitle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+                />
+                <textarea
+                  className="task-form-desc"
+                  placeholder="Descripción (opcional)"
+                  value={taskDesc}
+                  onChange={e => setTaskDesc(e.target.value)}
+                  rows={2}
+                />
+                <div className="task-form-row">
+                  <div className="task-priority-btns">
+                    {[
+                      { id: 'alta',  label: 'Alta' },
+                      { id: 'media', label: 'Media' },
+                      { id: 'baja',  label: 'Baja' },
+                    ].map(p => (
+                      <button
+                        key={p.id}
+                        className={`task-priority-btn task-priority-btn--${p.id}${taskPriority === p.id ? ` task-priority-btn--active` : ''}`}
+                        onClick={() => setTaskPriority(p.id)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="date"
+                    className="task-due-input"
+                    value={taskDueDate}
+                    onChange={e => setTaskDueDate(e.target.value)}
+                  />
+                  <button className="task-add-btn" onClick={handleAddTask} disabled={!taskTitle.trim() || savingTask}>
+                    {savingTask ? 'Añadiendo…' : 'Añadir tarea'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Task filters */}
+              <div className="task-filters">
+                {[
+                  { key: 'all',       label: 'Todas' },
+                  { key: 'pending',   label: 'Pendientes' },
+                  { key: 'completed', label: 'Completadas' },
+                  { key: 'alta',      label: 'Alta prioridad',  color: '#EF4444' },
+                  { key: 'media',     label: 'Media prioridad', color: '#F5C842' },
+                  { key: 'baja',      label: 'Baja prioridad',  color: '#84CC16' },
+                ].map(({ key, label, color }) => (
                   <button
-                    key={s}
-                    className="chat-suggestion-btn"
-                    onClick={() => { setChatQuery(s); generatePrompt(s) }}
+                    key={key}
+                    className={`filter-btn${taskFilter === key ? ' filter-btn--active' : ''}`}
+                    onClick={() => setTaskFilter(key)}
+                    style={taskFilter === key && color ? { borderColor: color, color } : {}}
                   >
-                    {s}
+                    {label}
                   </button>
                 ))}
               </div>
 
-              {chatPrompt && (
-                <>
-                  <textarea
-                    className="chat-prompt-output"
-                    readOnly
-                    value={chatPrompt}
-                  />
-                  <div className="chat-consejero-actions">
-                    <button
-                      className={`chat-copy-btn${chatPrompt ? ' chat-copy-btn--active' : ''}`}
-                      onClick={handleCopyPrompt}
-                      disabled={!chatPrompt}
-                    >
-                      {copied ? '✓ Copiado' : 'Copiar prompt'}
-                    </button>
-                    <a
-                      href="https://claude.ai"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="chat-claudeai-link"
-                    >
-                      Abrir Claude.ai ↗
-                    </a>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Filter bar + tag panel */}
-        {!loading && notes.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="filters">
-              {[
-                { key: 'all',       label: 'Todas' },
-                { key: 'active',    label: 'Activas' },
-                { key: 'completed', label: 'Completadas' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  className={`filter-btn${filter === key ? ' filter-btn--active' : ''}`}
-                  onClick={() => setFilter(key)}
-                >
-                  {label}
-                </button>
-              ))}
-              {usedCategories.map(cat => (
-                <button
-                  key={cat.id}
-                  className={`filter-btn${filter === cat.id ? ' filter-btn--active' : ''}`}
-                  onClick={() => setFilter(cat.id)}
-                  style={filter === cat.id ? { borderColor: cat.color, color: cat.color } : {}}
-                >
-                  {cat.label}
-                </button>
-              ))}
-              {tags.map(tag => {
-                const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
-                return (
-                  <button
-                    key={tag.id}
-                    className={`filter-btn${filter === tag.id ? ' filter-btn--active' : ''}`}
-                    onClick={() => setFilter(filter === tag.id ? 'all' : tag.id)}
-                    style={filter === tag.id
-                      ? { borderColor: color, color }
-                      : {}}
-                  >
-                    <span className="filter-tag-dot" style={{ background: color }} />
-                    {tag.name}
-                  </button>
-                )
-              })}
-              <button
-                className={`tag-add-panel-btn${showTagPanel ? ' tag-add-panel-btn--open' : ''}`}
-                onClick={() => setShowTagPanel(p => !p)}
-              >
-                ＋ Etiqueta
-              </button>
-            </div>
-
-            {showTagPanel && (
-              <div className="tag-panel">
-                <div className="tag-panel-header">
-                  <span className="tag-panel-title">Etiquetas personalizadas</span>
-                  <button className="tag-panel-close" onClick={() => setShowTagPanel(false)}>×</button>
-                </div>
-                <div className="tag-panel-create">
-                  <input
-                    className="tag-name-input"
-                    placeholder="Nombre de etiqueta"
-                    value={newTagName}
-                    onChange={e => setNewTagName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
-                    maxLength={30}
-                  />
-                  <div className="tag-palette">
-                    {PALETTE.map(p => (
-                      <button
-                        key={p.id}
-                        className={`tag-swatch${newTagPalette === p.id ? ' tag-swatch--selected' : ''}`}
-                        style={{ background: p.color }}
-                        onClick={() => setNewTagPalette(p.id)}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    className="tag-create-btn"
-                    onClick={handleCreateTag}
-                    disabled={!newTagName.trim() || savingTag}
-                  >
-                    Crear
-                  </button>
-                </div>
-                {tags.length > 0 && (
-                  <div className="tag-list">
-                    {tags.map(tag => {
-                      const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
-                      return (
-                        <div
-                          key={tag.id}
-                          className="tag-list-item"
-                          style={{
-                            background: `${color}22`,
-                            border: `1px solid ${color}55`,
-                            color,
-                          }}
+              {/* Task list */}
+              {loadingTasks ? (
+                <p className="notes-state">Cargando tareas…</p>
+              ) : sortedFilteredTasks.length === 0 ? (
+                <p className="notes-state">
+                  {tasks.length === 0 ? 'Añade tu primera tarea arriba.' : 'No hay tareas con este filtro.'}
+                </p>
+              ) : (
+                <div className="task-list">
+                  {sortedFilteredTasks.map(task => {
+                    const overdue = isOverdue(task.due_date) && !task.completed
+                    return (
+                      <div key={task.id} className={`task-row${task.completed ? ' task-row--completed' : ''}`}>
+                        <button
+                          className={`task-checkbox${task.completed ? ' task-checkbox--done' : ''}`}
+                          onClick={() => handleToggleTask(task)}
+                          title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
                         >
-                          {tag.name}
-                          <button
-                            className="tag-list-remove"
-                            onClick={() => handleDeleteTag(tag.id)}
-                            style={{ color }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Invisible backdrop to close tag dropdown */}
-        {tagDropdownFor && (
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-            onClick={() => setTagDropdownFor(null)}
-          />
-        )}
-
-        {/* Notes */}
-        {loading ? (
-          <p className="notes-state">Cargando notas…</p>
-        ) : filtered.length === 0 ? (
-          <p className="notes-state">
-            {notes.length === 0 ? 'Escribe tu primera nota arriba.' : 'No hay notas con este filtro.'}
-          </p>
-        ) : (
-          <div className="notes-grid">
-            {filtered.map(note => {
-              const primaryColor = CATEGORY_MAP[note.categories?.[0]]?.color ?? '#475569'
-              const isPending = groqPending.has(note.id)
-              const assignedTags = (note.custom_tags || [])
-                .map(tid => tags.find(t => t.id === tid))
-                .filter(Boolean)
-              const availableTags = tags.filter(t => !(note.custom_tags || []).includes(t.id))
-
-              return (
-                <div key={note.id} className={`note-card${note.completed ? ' note-card--completed' : ''}`}>
-                  {/* Category badges */}
-                  <div className="note-badges">
-                    {(note.categories || []).map(catId => {
-                      const cat = CATEGORY_MAP[catId]
-                      return cat ? (
-                        <span key={catId} className="note-badge" style={{ background: cat.color, color: cat.textColor }}>
-                          {cat.label}
-                        </span>
-                      ) : null
-                    })}
-                    <button
-                      className={`note-cat-edit-btn${editingCatsFor === note.id ? ' note-cat-edit-btn--active' : ''}`}
-                      onClick={() => setEditingCatsFor(editingCatsFor === note.id ? null : note.id)}
-                      title="Editar categorías"
-                    >
-                      ✏
-                    </button>
-                  </div>
-
-                  {/* Category editor */}
-                  {editingCatsFor === note.id && (
-                    <div className="cat-editor">
-                      {CATEGORIES.map(cat => {
-                        const active = (note.categories || []).includes(cat.id)
-                        const atMax = (note.categories || []).length >= 3
-                        const disabled = !active && atMax
-                        return (
-                          <button
-                            key={cat.id}
-                            className={`cat-editor-btn${active ? ' cat-editor-btn--active' : ''}${disabled ? ' cat-editor-btn--disabled' : ''}`}
-                            style={active ? { background: cat.color, color: cat.textColor, borderColor: '#F5C842' } : {}}
-                            onClick={() => handleToggleCategory(note, cat.id)}
-                            disabled={disabled}
-                            title={disabled ? 'Máximo 3 categorías' : undefined}
-                          >
-                            {cat.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Custom tag pills + add button */}
-                  {(tags.length > 0 || assignedTags.length > 0) && (
-                    <div className="note-tags">
-                      {assignedTags.map(tag => {
-                        const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
-                        return (
-                          <span
-                            key={tag.id}
-                            className="note-tag-pill"
-                            style={{
-                              background: `${color}28`,
-                              color,
-                              border: `1px solid ${color}50`,
-                            }}
-                          >
-                            {tag.name}
-                            <button
-                              className="note-tag-unassign"
-                              onClick={() => handleUnassignTag(note, tag.id)}
-                              style={{ color }}
-                            >
-                              ×
-                            </button>
+                          ✓
+                        </button>
+                        <div className="task-row-content">
+                          <span className={`task-title${task.completed ? ' task-title--done' : ''}`}>
+                            {task.title}
                           </span>
-                        )
-                      })}
-                      {tags.length > 0 && (
-                        <div className="note-tag-add" style={{ position: 'relative', zIndex: tagDropdownFor === note.id ? 50 : 'auto' }}>
-                          <button
-                            className="note-tag-add-btn"
-                            onClick={() => setTagDropdownFor(tagDropdownFor === note.id ? null : note.id)}
-                          >
-                            ＋ tag
-                          </button>
-                          {tagDropdownFor === note.id && (
-                            <div className="note-tag-dropdown">
-                              {availableTags.length === 0 ? (
-                                <span className="note-tag-dropdown-empty">Todas asignadas</span>
-                              ) : (
-                                availableTags.map(tag => {
-                                  const color = PALETTE_MAP[tag.palette] ?? '#A8A29E'
-                                  return (
-                                    <button
-                                      key={tag.id}
-                                      className="note-tag-dropdown-item"
-                                      onClick={() => handleAssignTag(note, tag.id)}
-                                    >
-                                      <span className="note-tag-dropdown-dot" style={{ background: color }} />
-                                      {tag.name}
-                                    </button>
-                                  )
-                                })
-                              )}
-                            </div>
+                          {task.description && (
+                            <span className="task-row-desc">{task.description}</span>
                           )}
+                          <div className="task-row-meta">
+                            <span
+                              className="task-priority-badge"
+                              style={{
+                                background: PRIORITY_COLOR[task.priority] + '28',
+                                color: PRIORITY_COLOR[task.priority],
+                                border: `1px solid ${PRIORITY_COLOR[task.priority]}55`,
+                              }}
+                            >
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                            {task.due_date && (
+                              <span className={`task-due${overdue ? ' task-due--overdue' : ''}`}>
+                                {overdue ? '⚠ ' : ''}{formatDueDate(task.due_date)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Note text */}
-                  <p className="note-text">{note.text}</p>
-
-                  {/* AI enrichment */}
-                  {isPending ? (
-                    <p className="note-generating">Generando resumen…</p>
-                  ) : note.summary ? (
-                    <div className="note-enrichment">
-                      <p className="note-summary" style={{ borderLeftColor: primaryColor }}>
-                        {note.summary}
-                      </p>
-                      {note.keywords?.length > 0 && (
-                        <div className="note-keywords">
-                          {note.keywords.map(kw => (
-                            <span key={kw} className="note-keyword">#{kw}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-
-                  {/* Footer */}
-                  <div className="note-footer">
-                    <span className="note-date">{formatDate(note.created_at)}</span>
-                    <div className="note-actions">
-                      <button
-                        className={`note-check${note.completed ? ' note-check--done' : ''}`}
-                        onClick={() => handleToggleComplete(note)}
-                        title={note.completed ? 'Marcar como activa' : 'Marcar como completada'}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        className="note-delete"
-                        onClick={() => handleDelete(note.id)}
-                        title="Eliminar nota"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
+                        <button className="task-delete" onClick={() => handleDeleteTask(task.id)} title="Eliminar tarea">×</button>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </main>
+              )}
+            </>
+          )}
+
+        </main>
+      </div>
     </div>
   )
 }
