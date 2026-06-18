@@ -1,10 +1,39 @@
+import { useState, useEffect } from 'react'
+import { supabase } from './supabaseClient'
+import Auth from './components/Auth'
+import AppShell from './components/AppShell'
+
 function App() {
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [view, setView] = useState('landing')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) return null
+
+  if (session) return <AppShell />
+
+  if (view === 'auth') return <Auth onBack={() => setView('landing')} />
+
   return (
     <div className="app">
 
       {/* NAV */}
       <nav className="nav">
         <span className="nav-logo">2BRAIN</span>
+        <button className="nav-acceder" onClick={() => setView('auth')}>Acceder</button>
       </nav>
 
       {/* HERO */}
