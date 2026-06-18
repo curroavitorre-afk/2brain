@@ -813,6 +813,45 @@ body {
   background: rgba(248, 113, 113, 0.08);
 }
 
+/* ─── AI ENRICHMENT ─────────────────────────────────────── */
+.note-generating {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.5);
+  font-style: italic;
+}
+
+.note-enrichment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-summary {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-sec);
+  line-height: 1.55;
+  background: #1a1a2e;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid;
+}
+
+.note-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.note-keyword {
+  font-size: 11px;
+  color: rgba(245, 200, 66, 0.7);
+  background: #1a1a2e;
+  border-radius: 100px;
+  padding: 3px 9px;
+  font-weight: 500;
+}
+
 /* ─── RESPONSIVE ────────────────────────────────────────── */
 @media (max-width: 600px) {
   .shell-header {
