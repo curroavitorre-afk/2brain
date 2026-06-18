@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import {
+  Brain, CheckSquare, Lightbulb, Pencil, Check, X,
+  Tag, Plus, AlertTriangle, Circle, CheckCircle, Menu,
+} from 'lucide-react'
 
 const CATEGORIES = [
   { id: 'idea-negocio', label: 'Idea de negocio',     color: '#F5C842', textColor: '#000' },
@@ -382,14 +386,14 @@ Mi pregunta: ${pregunta}`
             className={`sidebar-nav-item${activeView === 'thoughts' ? ' sidebar-nav-item--active' : ''}`}
             onClick={() => { setActiveView('thoughts'); setSidebarOpen(false) }}
           >
-            <span className="sidebar-nav-icon">🧠</span>
+            <span className="sidebar-nav-icon"><Lightbulb size={16} /></span>
             Pensamientos
           </button>
           <button
             className={`sidebar-nav-item${activeView === 'tasks' ? ' sidebar-nav-item--active' : ''}`}
             onClick={() => { setActiveView('tasks'); setSidebarOpen(false) }}
           >
-            <span className="sidebar-nav-icon">✅</span>
+            <span className="sidebar-nav-icon"><CheckSquare size={16} /></span>
             Tareas
           </button>
         </nav>
@@ -405,9 +409,10 @@ Mi pregunta: ${pregunta}`
       {/* Main body */}
       <div className="shell-body">
         <header className="shell-header">
-          <button className="hamburger-btn" onClick={() => setSidebarOpen(p => !p)}>☰</button>
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(p => !p)}><Menu size={20} /></button>
           <span className="shell-header-title">
-            {activeView === 'thoughts' ? '🧠 Pensamientos' : '✅ Tareas'}
+            {activeView === 'thoughts' ? <Lightbulb size={15} /> : <CheckSquare size={15} />}
+            {activeView === 'thoughts' ? 'Pensamientos' : 'Tareas'}
           </span>
         </header>
 
@@ -440,7 +445,7 @@ Mi pregunta: ${pregunta}`
                   className={`chat-consejero-toggle${chatOpen ? ' chat-consejero-toggle--open' : ''}`}
                   onClick={() => setChatOpen(p => !p)}
                 >
-                  <span>🧠 Chat Consejero</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Brain size={16} /> Chat Consejero</span>
                   <span className="chat-consejero-chevron">{chatOpen ? '▲' : '▼'}</span>
                 </button>
 
@@ -459,7 +464,7 @@ Mi pregunta: ${pregunta}`
                         onKeyDown={e => e.key === 'Enter' && generatePrompt(chatQuery)}
                       />
                       {(chatQuery || chatPrompt) && (
-                        <button className="chat-consejero-clear" onClick={handleClearChat}>×</button>
+                        <button className="chat-consejero-clear" onClick={handleClearChat}><X size={14} /></button>
                       )}
                     </div>
 
@@ -480,7 +485,10 @@ Mi pregunta: ${pregunta}`
                             onClick={handleCopyPrompt}
                             disabled={!chatPrompt}
                           >
-                            {copied ? '✓ Copiado' : 'Copiar prompt'}
+                            {copied
+                              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><Check size={13} />Copiado</span>
+                              : 'Copiar prompt'
+                            }
                           </button>
                           <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" className="chat-claudeai-link">
                             Abrir Claude.ai ↗
@@ -536,8 +544,9 @@ Mi pregunta: ${pregunta}`
                     <button
                       className={`tag-add-panel-btn${showTagPanel ? ' tag-add-panel-btn--open' : ''}`}
                       onClick={() => setShowTagPanel(p => !p)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                     >
-                      ＋ Etiqueta
+                      <Tag size={11} /> Etiqueta
                     </button>
                   </div>
 
@@ -545,7 +554,7 @@ Mi pregunta: ${pregunta}`
                     <div className="tag-panel">
                       <div className="tag-panel-header">
                         <span className="tag-panel-title">Etiquetas personalizadas</span>
-                        <button className="tag-panel-close" onClick={() => setShowTagPanel(false)}>×</button>
+                        <button className="tag-panel-close" onClick={() => setShowTagPanel(false)}><X size={14} /></button>
                       </div>
                       <div className="tag-panel-create">
                         <input
@@ -581,7 +590,7 @@ Mi pregunta: ${pregunta}`
                                 style={{ background: `${color}22`, border: `1px solid ${color}55`, color }}
                               >
                                 {tag.name}
-                                <button className="tag-list-remove" onClick={() => handleDeleteTag(tag.id)} style={{ color }}>×</button>
+                                <button className="tag-list-remove" onClick={() => handleDeleteTag(tag.id)} style={{ color }}><X size={10} /></button>
                               </div>
                             )
                           })}
@@ -629,7 +638,7 @@ Mi pregunta: ${pregunta}`
                             onClick={() => setEditingCatsFor(editingCatsFor === note.id ? null : note.id)}
                             title="Editar categorías"
                           >
-                            ✏
+                            <Pencil size={12} />
                           </button>
                         </div>
 
@@ -664,14 +673,18 @@ Mi pregunta: ${pregunta}`
                               return (
                                 <span key={tag.id} className="note-tag-pill" style={{ background: `${color}28`, color, border: `1px solid ${color}50` }}>
                                   {tag.name}
-                                  <button className="note-tag-unassign" onClick={() => handleUnassignTag(note, tag.id)} style={{ color }}>×</button>
+                                  <button className="note-tag-unassign" onClick={() => handleUnassignTag(note, tag.id)} style={{ color }}><X size={10} /></button>
                                 </span>
                               )
                             })}
                             {tags.length > 0 && (
                               <div className="note-tag-add" style={{ position: 'relative', zIndex: tagDropdownFor === note.id ? 50 : 'auto' }}>
-                                <button className="note-tag-add-btn" onClick={() => setTagDropdownFor(tagDropdownFor === note.id ? null : note.id)}>
-                                  ＋ tag
+                                <button
+                                  className="note-tag-add-btn"
+                                  onClick={() => setTagDropdownFor(tagDropdownFor === note.id ? null : note.id)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                >
+                                  <Plus size={10} /> tag
                                 </button>
                                 {tagDropdownFor === note.id && (
                                   <div className="note-tag-dropdown">
@@ -721,9 +734,9 @@ Mi pregunta: ${pregunta}`
                               onClick={() => handleToggleComplete(note)}
                               title={note.completed ? 'Marcar como activa' : 'Marcar como completada'}
                             >
-                              ✓
+                              <Check size={14} />
                             </button>
-                            <button className="note-delete" onClick={() => handleDelete(note.id)} title="Eliminar nota">×</button>
+                            <button className="note-delete" onClick={() => handleDelete(note.id)} title="Eliminar nota"><X size={14} /></button>
                           </div>
                         </div>
                       </div>
@@ -820,7 +833,7 @@ Mi pregunta: ${pregunta}`
                           onClick={() => handleToggleTask(task)}
                           title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
                         >
-                          ✓
+                          {task.completed ? <CheckCircle size={20} /> : <Circle size={20} />}
                         </button>
                         <div className="task-row-content">
                           <span className={`task-title${task.completed ? ' task-title--done' : ''}`}>
@@ -841,13 +854,13 @@ Mi pregunta: ${pregunta}`
                               {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                             </span>
                             {task.due_date && (
-                              <span className={`task-due${overdue ? ' task-due--overdue' : ''}`}>
-                                {overdue ? '⚠ ' : ''}{formatDueDate(task.due_date)}
+                              <span className={`task-due${overdue ? ' task-due--overdue' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                {overdue && <AlertTriangle size={11} />}{formatDueDate(task.due_date)}
                               </span>
                             )}
                           </div>
                         </div>
-                        <button className="task-delete" onClick={() => handleDeleteTask(task.id)} title="Eliminar tarea">×</button>
+                        <button className="task-delete" onClick={() => handleDeleteTask(task.id)} title="Eliminar tarea"><X size={14} /></button>
                       </div>
                     )
                   })}
