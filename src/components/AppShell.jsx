@@ -112,6 +112,9 @@ export default function AppShell({ session }) {
   const [savingTag, setSavingTag]     = useState(false)
   const [tagDropdownFor, setTagDropdownFor] = useState(null)
 
+  // Category editing state
+  const [editingCatsFor, setEditingCatsFor] = useState(null)
+
   // Chat Consejero state
   const [chatOpen, setChatOpen]       = useState(false)
   const [chatQuery, setChatQuery]     = useState('')
@@ -231,6 +234,25 @@ export default function AppShell({ session }) {
     const { data, error } = await supabase.from('notes').update({ custom_tags: newTags }).eq('id', note.id).select().single()
     if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
     setTagDropdownFor(null)
+  }
+
+  async function handleToggleCategory(note, catId) {
+    const current = note.categories || []
+    let next
+    if (current.includes(catId)) {
+      if (current.length <= 1) return
+      next = current.filter(c => c !== catId)
+    } else {
+      if (current.length >= 3) return
+      next = [...current, catId]
+    }
+    const { data, error } = await supabase
+      .from('notes')
+      .update({ categories: next })
+      .eq('id', note.id)
+      .select()
+      .single()
+    if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
   }
 
   function generatePrompt(pregunta) {
@@ -534,7 +556,37 @@ Mi pregunta: ${pregunta}`
                         </span>
                       ) : null
                     })}
+                    <button
+                      className={`note-cat-edit-btn${editingCatsFor === note.id ? ' note-cat-edit-btn--active' : ''}`}
+                      onClick={() => setEditingCatsFor(editingCatsFor === note.id ? null : note.id)}
+                      title="Editar categorías"
+                    >
+                      ✏
+                    </button>
                   </div>
+
+                  {/* Category editor */}
+                  {editingCatsFor === note.id && (
+                    <div className="cat-editor">
+                      {CATEGORIES.map(cat => {
+                        const active = (note.categories || []).includes(cat.id)
+                        const atMax = (note.categories || []).length >= 3
+                        const disabled = !active && atMax
+                        return (
+                          <button
+                            key={cat.id}
+                            className={`cat-editor-btn${active ? ' cat-editor-btn--active' : ''}${disabled ? ' cat-editor-btn--disabled' : ''}`}
+                            style={active ? { background: cat.color, color: cat.textColor, borderColor: '#F5C842' } : {}}
+                            onClick={() => handleToggleCategory(note, cat.id)}
+                            disabled={disabled}
+                            title={disabled ? 'Máximo 3 categorías' : undefined}
+                          >
+                            {cat.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Custom tag pills + add button */}
                   {(tags.length > 0 || assignedTags.length > 0) && (

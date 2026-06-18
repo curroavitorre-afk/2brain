@@ -1353,3 +1353,71 @@ body {
 .chat-claudeai-link:hover {
   color: var(--violet);
 }
+
+/* ─── CATEGORY EDITOR ───────────────────────────────────── */
+.note-cat-edit-btn {
+  background: transparent;
+  border: none;
+  color: rgba(148, 163, 184, 0.35);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.note-cat-edit-btn:hover,
+.note-cat-edit-btn--active {
+  color: var(--gold);
+  background: rgba(245, 200, 66, 0.08);
+}
+
+.cat-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px;
+  background: #1a1a2e;
+  border-radius: 10px;
+  animation: catEditorIn 0.18s ease;
+}
+
+@keyframes catEditorIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cat-editor-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-sec);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  width: 120px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.cat-editor-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}
+
+.cat-editor-btn--active {
+  border-color: #F5C842 !important;
+  font-weight: 600;
+}
+
+.cat-editor-btn--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
