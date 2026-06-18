@@ -23,7 +23,7 @@ function App() {
 
   if (loading) return null
 
-  if (session) return <AppShell />
+  if (session) return <AppShell session={session} />
 
   if (view === 'auth') return <Auth onBack={() => setView('landing')} />
 

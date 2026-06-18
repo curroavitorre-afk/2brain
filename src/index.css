@@ -531,32 +531,42 @@ body {
   opacity: 0.8;
 }
 
-/* ─── APP SHELL ─────────────────────────────────────────── */
-.app-shell {
+/* ─── SHELL LAYOUT ──────────────────────────────────────── */
+.shell {
   min-height: 100svh;
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 32px;
 }
 
-.app-shell-title {
-  font-size: 24px;
-  font-weight: 700;
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(6, 6, 15, 0.9);
+  border-bottom: 1px solid rgba(245, 200, 66, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.shell-logo {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 5px;
   color: var(--gold);
-  letter-spacing: -0.3px;
 }
 
 .signout-btn {
   background: transparent;
   color: var(--text-sec);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px 24px;
+  border-radius: 7px;
+  padding: 7px 16px;
   font-family: 'Inter', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
@@ -565,4 +575,260 @@ body {
 .signout-btn:hover {
   border-color: rgba(255, 255, 255, 0.25);
   color: var(--text);
+}
+
+.shell-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 32px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ─── WRITE AREA ────────────────────────────────────────── */
+.write-area {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.write-area:focus-within {
+  border-color: rgba(245, 200, 66, 0.3);
+}
+
+.write-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 20px 24px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.write-textarea::placeholder {
+  color: rgba(148, 163, 184, 0.4);
+}
+
+.write-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.write-hint {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.45);
+}
+
+.save-btn {
+  background: var(--gold);
+  color: #06060F;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 22px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.save-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.save-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.save-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ─── FILTERS ───────────────────────────────────────────── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-btn {
+  background: transparent;
+  color: var(--text-sec);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text);
+}
+
+.filter-btn--active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* ─── NOTES GRID ────────────────────────────────────────── */
+.notes-state {
+  text-align: center;
+  color: var(--text-sec);
+  font-size: 15px;
+  padding: 48px 0;
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.note-card {
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.note-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.note-card--completed {
+  opacity: 0.6;
+  border-left: 3px solid #22c55e;
+}
+
+.note-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.note-badge {
+  display: inline-block;
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.note-text {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.6;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.note-date {
+  font-size: 12px;
+  color: var(--text-sec);
+}
+
+.note-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.note-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: var(--text-sec);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.note-check:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.note-check--done {
+  border-color: #22c55e;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.note-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-sec);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.note-delete:hover {
+  border-color: #f87171;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+/* ─── RESPONSIVE ────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .shell-header {
+    padding: 14px 20px;
+  }
+
+  .shell-main {
+    padding: 24px 16px 60px;
+    gap: 24px;
+  }
+
+  .write-textarea {
+    font-size: 15px;
+  }
+
+  .notes-grid {
+    grid-template-columns: 1fr;
+  }
 }
