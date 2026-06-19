@@ -109,7 +109,7 @@ async function callGroq(noteId, text, onSuccess) {
   }
 }
 
-export default function AppShell({ session }) {
+export default function AppShell({ session, onGoHome }) {
   // Layout
   const [activeView, setActiveView]   = useState('thoughts')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -379,7 +379,7 @@ Mi pregunta: ${pregunta}`
 
       {/* Sidebar */}
       <aside className={`shell-sidebar${sidebarOpen ? ' shell-sidebar--open' : ''}`}>
-        <div className="sidebar-logo">2BRAIN</div>
+        <button className="sidebar-logo sidebar-logo-btn" onClick={onGoHome}>2BRAIN</button>
 
         <nav className="sidebar-nav">
           <button
