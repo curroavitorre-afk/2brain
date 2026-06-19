@@ -4,6 +4,7 @@ import {
   Brain, CheckSquare, Lightbulb, Pencil, Check, X,
   Tag, Plus, AlertTriangle, Circle, CheckCircle, Menu,
 } from 'lucide-react'
+import Onboarding from './Onboarding'
 
 const CATEGORIES = [
   { id: 'idea-negocio', label: 'Idea de negocio',     color: '#F5C842', textColor: '#000' },
@@ -110,6 +111,9 @@ async function callGroq(noteId, text, onSuccess) {
 }
 
 export default function AppShell({ session, onGoHome }) {
+  // Onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
   // Layout
   const [activeView, setActiveView]   = useState('thoughts')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -158,6 +162,15 @@ export default function AppShell({ session, onGoHome }) {
       if (!notesRes.error) setNotes(notesRes.data || [])
       if (!tagsRes.error) setTags(tagsRes.data || [])
       setLoading(false)
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', session.user.id)
+        .single()
+      if (profileError || !profile?.onboarding_completed) {
+        setShowOnboarding(true)
+      }
     }
     loadData()
   }, [session.user.id])
@@ -275,6 +288,11 @@ export default function AppShell({ session, onGoHome }) {
     if (!error && data) setNotes(prev => prev.map(n => n.id === note.id ? data : n))
   }
 
+  async function completeOnboarding() {
+    await supabase.from('profiles').upsert({ id: session.user.id, onboarding_completed: true })
+    setShowOnboarding(false)
+  }
+
   // ── Chat Consejero ───────────────────────────────────────
 
   function generatePrompt(pregunta) {
@@ -372,6 +390,8 @@ Mi pregunta: ${pregunta}`
 
   return (
     <div className="shell">
+      {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
+
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />

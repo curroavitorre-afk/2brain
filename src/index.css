@@ -1969,3 +1969,81 @@ body {
 
 .cat-editor-btn--active   { border-color: #F5C842 !important; font-weight: 600; }
 .cat-editor-btn--disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ─── ONBOARDING ────────────────────────────────────────── */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #06060F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.onboarding-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.onboarding-card {
+  background: #0F0F1E;
+  border: 1px solid rgba(245, 200, 66, 0.15);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  opacity: 0;
+  animation: onboardingCardIn 0.5s ease forwards;
+}
+
+@keyframes onboardingCardIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.onboarding-btn {
+  background: transparent;
+  color: #F5C842;
+  border: 1px solid #F5C842;
+  border-radius: 8px;
+  padding: 12px 32px;
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  margin-top: 8px;
+}
+
+.onboarding-btn:hover {
+  background: #F5C842;
+  color: #000;
+}
+
+.onboarding-dots {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.onboarding-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(245, 200, 66, 0.2);
+  transition: background 0.3s ease;
+}
+
+.onboarding-dot--active {
+  background: #F5C842;
+}
