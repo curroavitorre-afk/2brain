@@ -924,12 +924,6 @@ body {
   gap: 7px;
 }
 
-.shell-logo {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 5px;
-  color: var(--gold);
-}
 
 .signout-btn {
   background: transparent;

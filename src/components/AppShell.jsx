@@ -188,7 +188,6 @@ export default function AppShell({ session, onGoHome }) {
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
     if (!error) setTasks(data || [])
-    else console.error('[2brain] tasks table error — create it in Supabase dashboard:', error.message)
     setLoadingTasks(false)
   }
 
@@ -338,8 +337,6 @@ Mi pregunta: ${pregunta}`
     if (!error && data) {
       setTasks(prev => [data, ...prev])
       setTaskTitle(''); setTaskDesc(''); setTaskPriority('media'); setTaskDueDate('')
-    } else if (error) {
-      console.error('[2brain] error adding task:', error.message)
     }
     setSavingTask(false)
   }
