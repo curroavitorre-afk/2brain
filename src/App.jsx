@@ -16,129 +16,8 @@ function useInView(ref) {
   }, [ref])
 }
 
-function BrainSVG() {
-  const nodesLeft = [
-    [162, 148, 0.0],
-    [118, 208, 0.4],
-    [96,  270, 0.8],
-    [132, 342, 1.2],
-    [200, 374, 1.6],
-  ]
-  const nodesRight = [
-    [338, 148, 2.0],
-    [382, 208, 2.4],
-    [404, 270, 2.8],
-    [368, 342, 3.2],
-    [300, 374, 3.6],
-  ]
-  const signalsAmber = [
-    { d: 'M 216,115 C 194,140 178,170 175,207 C 172,244 180,276 198,305 C 212,328 222,354 218,385', delay: '0s' },
-    { d: 'M 148,155 C 128,185 116,224 115,260 C 114,293 124,320 142,342', delay: '0.6s' },
-  ]
-  const signalsViolet = [
-    { d: 'M 284,115 C 306,140 322,170 325,207 C 328,244 320,276 302,305 C 288,328 278,354 282,385', delay: '1.2s' },
-    { d: 'M 352,155 C 372,185 384,224 385,260 C 386,293 376,320 358,342', delay: '1.8s' },
-  ]
-  const particles = [
-    { cy: 68, color: '#F5C842', dur: 8,  delay: '0s' },
-    { cy: 72, color: '#F5C842', dur: 11, delay: '-3.67s' },
-    { cy: 70, color: '#F5C842', dur: 14, delay: '-9.33s' },
-    { cy: 74, color: '#8B5CF6', dur: 9,  delay: '-1.5s' },
-    { cy: 76, color: '#8B5CF6', dur: 12, delay: '-6s' },
-    { cy: 71, color: '#8B5CF6', dur: 15, delay: '-10s' },
-  ]
-
-  return (
-    <svg viewBox="0 0 500 500" className="brain-svg" aria-hidden="true">
-      <defs>
-        <filter id="glowAmber" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" result="comp" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        <filter id="glowViolet" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" result="comp" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {/* LEFT HEMISPHERE — amber */}
-      <g filter="url(#glowAmber)">
-        <path className="brain-hemi-left"
-          d="M 248,108 C 226,100 200,100 174,112 C 148,124 122,146 104,175
-             C 84,206 80,240 84,272 C 88,302 106,328 132,348
-             C 156,368 188,380 218,386 C 230,390 240,392 248,392 Z"
-        />
-        <path className="brain-gyrus-left" d="M 220,112 C 198,136 182,165 179,202 C 176,238 183,271 196,300 C 208,326 218,352 216,386" />
-        <path className="brain-gyrus-left" d="M 186,126 C 162,154 146,188 142,228 C 138,266 148,300 164,328 C 178,352 195,366 210,380" />
-        <path className="brain-gyrus-left" d="M 148,152 C 128,184 116,222 115,258 C 114,292 124,320 140,342" />
-        <path className="brain-gyrus-left" d="M 104,200 C 94,232 92,264 98,294 C 106,320 124,342 148,357" />
-        <path className="brain-gyrus-left" d="M 88,270 C 96,300 114,327 139,346 C 162,364 190,376 216,384" />
-      </g>
-
-      {/* RIGHT HEMISPHERE — violet */}
-      <g filter="url(#glowViolet)">
-        <path className="brain-hemi-right"
-          d="M 252,108 C 274,100 300,100 326,112 C 352,124 378,146 396,175
-             C 416,206 420,240 416,272 C 412,302 394,328 368,348
-             C 344,368 312,380 282,386 C 270,390 260,392 252,392 Z"
-        />
-        <path className="brain-gyrus-right" d="M 280,112 C 302,136 318,165 321,202 C 324,238 317,271 304,300 C 292,326 282,352 284,386" />
-        <path className="brain-gyrus-right" d="M 314,126 C 338,154 354,188 358,228 C 362,266 352,300 336,328 C 322,352 305,366 290,380" />
-        <path className="brain-gyrus-right" d="M 352,152 C 372,184 384,222 385,258 C 386,292 376,320 360,342" />
-        <path className="brain-gyrus-right" d="M 396,200 C 406,232 408,264 402,294 C 394,320 376,342 352,357" />
-        <path className="brain-gyrus-right" d="M 412,270 C 404,300 386,327 361,346 C 338,364 310,376 284,384" />
-      </g>
-
-      {/* CORPUS CALLOSUM */}
-      <g opacity="0.6">
-        <rect x="238" y="192" width="24" height="116" rx="12"
-          fill="none" stroke="#E2E8F0" strokeWidth="2" />
-        {[210, 224, 238, 252, 266, 280, 294].map(y => (
-          <line key={y} x1="240" y1={y} x2="260" y2={y}
-            stroke="#E2E8F0" strokeWidth="1" opacity="0.5" />
-        ))}
-      </g>
-
-      {/* NEURAL SIGNALS */}
-      {signalsAmber.map((s, i) => (
-        <path key={`sa${i}`} className="neon-signal-amber" d={s.d} style={{ animationDelay: s.delay }} />
-      ))}
-      {signalsViolet.map((s, i) => (
-        <path key={`sv${i}`} className="neon-signal-violet" d={s.d} style={{ animationDelay: s.delay }} />
-      ))}
-
-      {/* ACTIVITY NODES */}
-      {nodesLeft.map(([cx, cy, delay], i) => (
-        <circle key={`nl${i}`} cx={cx} cy={cy} r="3"
-          className="neon-node" fill="#F5C842"
-          style={{ animationDelay: `${delay}s` }} />
-      ))}
-      {nodesRight.map(([cx, cy, delay], i) => (
-        <circle key={`nr${i}`} cx={cx} cy={cy} r="3"
-          className="neon-node" fill="#8B5CF6"
-          style={{ animationDelay: `${delay}s` }} />
-      ))}
-
-      {/* ORBITING PARTICLES */}
-      {particles.map((p, i) => (
-        <g key={`pt${i}`} style={{
-          transformOrigin: '250px 250px',
-          animation: `orbitParticle ${p.dur}s linear ${p.delay} infinite`,
-        }}>
-          <circle cx="250" cy={p.cy} r="2" fill={p.color} opacity="0.8" />
-        </g>
-      ))}
-    </svg>
-  )
-}
+const WIRE_PATH =
+  'M 40,0 L 40,200 Q 40,220 56,220 Q 72,220 72,240 L 72,280 Q 72,300 56,300 Q 40,300 40,320 L 40,580 Q 40,600 56,600 Q 72,600 72,620 L 72,660 Q 72,680 56,680 Q 40,680 40,700 L 40,900'
 
 function Landing({ onAcceder }) {
   const [scrolled, setScrolled] = useState(false)
@@ -203,6 +82,45 @@ function Landing({ onAcceder }) {
       <div id="cursor-dot" />
       <div id="cursor-glow" />
 
+      {/* WIRE NEÓN */}
+      <svg
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100vh',
+          pointerEvents: 'none',
+          zIndex: 5,
+        }}
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <style>{`
+            @keyframes wireDraw {
+              to { stroke-dashoffset: 0; }
+            }
+          `}</style>
+        </defs>
+        <path
+          d={WIRE_PATH}
+          fill="none"
+          stroke="#F5C842"
+          strokeWidth="1.5"
+          style={{
+            filter: 'drop-shadow(0 0 4px #F5C842)',
+            strokeDasharray: '920',
+            strokeDashoffset: '920',
+            animation: 'wireDraw 3s ease forwards',
+          }}
+        />
+        <circle r="3" fill="#F5C842">
+          <animateMotion dur="4s" repeatCount="indefinite" path={WIRE_PATH} />
+        </circle>
+      </svg>
+
       {/* NAV */}
       <nav className={`nav${scrolled ? ' nav--scrolled' : ''}`}>
         <span className="nav-logo">2BRAIN</span>
@@ -214,7 +132,7 @@ function Landing({ onAcceder }) {
         <div className="dot-grid" aria-hidden="true" />
 
         <div className="hero-brain-col">
-          <BrainSVG />
+          <img src="/brain.png" alt="2Brain" style={{ width: '480px', maxWidth: '100%' }} />
         </div>
 
         <div className="hero-text-col">
